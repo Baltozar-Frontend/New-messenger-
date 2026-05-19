@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram X-Premium Clone</title>
+    <style>
+        /* ==========================================================================
+           1. ПЕРЕМЕННЫЕ И ОБНУЛЕНИЕ СТИЛЕЙ
+           ========================================================================== */
+        :root {
+            --bg-main: #0e1621;
+            --bg-sidebar: #17212b;
+            --bg-chat: #0e1621;
+            --bg-active-item: #2b394a;
+            --bg-hover-item: #202b36;
+            --bg-input: #24303f;
+            --bg-msg-in: #182533;
+            --bg-msg-out: #2b5278;
+            --text-main: #f5f5f5;
+            --text-muted: #7f91a4;
+            --text-link: #5288c1;
+            --text-out-time: #7e9cb8;
+            --accent: #5288c1;
+            --accent-hover: #649ad4;
+            --border: #101924;
+            --danger: #e24a4a;
+            --success: #46b06a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: #111923;
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* ==========================================================================
+           2. СТРУКТУРА ПРИЛОЖЕНИЯ
+           ========================================================================== */
+        .app-wrapper {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-main);
+            position: relative;
+        }
+
+        /* Экран авторизации */
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-main);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+
+        .auth-card {
+            background-color: var(--bg-sidebar);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .auth-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #5288c1, #3a6d9c);
+            border-radius: 22px;
+            margin: 0 auto 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            box-shadow: 0 6px 20px rgba(82, 136, 193, 0.3);
+        }
+
+        .auth-card h2 {
+            font-size: 1.6rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .auth-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .input-group span {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 14px 15px 14px 35px;
+            background-color: var(--bg-input);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .auth-input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* ==========================================================================
+           3. БОКОВАЯ ПАНЕЛЬ (СПИСОК ЧАТОВ)
+           ========================================================================== */
+        .sidebar {
+            width: 320px;
+            min-width: 280px;
+            height: 100%;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .profile-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .my-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .my-info h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .my-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 15px 10px 38px;
+            background-color: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--text-main);
+            outline: none;
+            font-size: 0.9rem;
+        }
+
+        .search-container::before {
+            content: "🔍";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.85rem;
+            opacity: 0.5;
+        }
+
+        /* Списки сущностей */
+        .list-scrollable {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            padding: 10px 15px 5px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            position: relative;
+        }
+
+        .chat-item:hover {
+            background-color: var(--bg-hover-item);
+        }
+
+        .chat-item.active {
+            background-color: var(--bg-active-item);
+        }
+
+        .item-avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            margin-right: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #fff;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+
+        .item-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .item-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-preview {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 5px;
+        }
+
+        .item-preview.typing {
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .badge-unread {
+            background-color: var(--accent);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 2px 7px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* ==========================================================================
+           4. ОСНОВНОЕ ОКНО ЧАТА
+           ========================================================================== */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-chat);
+            position: relative;
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+            background-blend-mode: overlay;
+        }
+
+        /* Окно-заглушка "Выберите чат" */
+        .placeholder-view {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .placeholder-view p {
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 6px 16px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* Шапка текущего чата */
+        .chat-header {
+            height: 60px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            z-index: 4;
+        }
+
+        .active-user-details {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .active-user-info h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .active-user-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Поток сообщений */
+        .messages-viewport {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 10%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .msg-bubble {
+            max-width: 65%;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 0.93rem;
+            line-height: 1.4;
+            position: relative;
+            word-wrap: break-word;
+            animation: slideUp 0.15s ease-out;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg-bubble.inbound {
+            background-color: var(--bg-msg-in);
+            align-self: flex-start;
+            border-top-left-radius: 3px;
+        }
+
+        .msg-bubble.outbound {
+            background-color: var(--bg-msg-out);
+            align-self: flex-end;
+            border-top-right-radius: 3px;
+        }
+
+        .msg-timestamp {
+            font-size: 0.7rem;
+            margin-top: 4px;
+            margin-left: 10px;
+            float: right;
+            color: var(--text-muted);
+        }
+
+        .msg-bubble.outbound .msg-timestamp {
+            color: var(--text-out-time);
+        }
+
+        /* Панель ввода */
+        .chat-input-panel {
+            background-color: var(--bg-sidebar);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-top: 1px solid var(--border);
+            z-index: 4;
+        }
+
+        .message-input-node {
+            flex: 1;
+            padding: 12px 15px;
+            background-color: var(--bg-input);
+            border: none;
+            border-radius: 8px;
+            color: var(--text-main);
+            outline: none;
+            font-size: 0.95rem;
+        }
+
+        .action-send-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.1s;
+        }
+
+        .action-send-btn:hover {
+            color: var(--accent-hover);
+        }
+
+        /* Кастомный скроллбар */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="app-wrapper">
+
+        <!-- ==========================================================================
+             БЛОК АВТОРИЗАЦИИ
+             ========================================================================== */ -->
+        <div class="auth-overlay" id="authScreen">
+            <div class="auth-card">
+                <div class="auth-logo">✈</div>
+                <h2>Создать аккаунт</h2>
+                <p>Введите ваш уникальный юзернейм для регистрации на локальном узле связи.</p>
+                <div class="input-group">
+                    <span>@</span>
+                    <input type="text" id="usernameInput" class="auth-input" placeholder="username" maxlength="15" autocomplete="off">
+                </div>
+                <button class="btn-submit" id="authSubmitBtn">Войти в мессенджер</button>
+            </div>
+        </div>
+
+        <!-- ==========================================================================
+             САЙДБАР (СПИСОК ЧАТОВ И ПОИСК)
+             ========================================================================== */ -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="profile-title">
+                    <div class="my-avatar" id="myAvatarNode">?</div>
+                    <div class="my-info">
+                        <h3 id="myNameNode">Загрузка...</h3>
+                        <p>в сети (Локальный узел)</p>
+                    </div>
+                </div>
+                <div class="search-container">
+                    <input type="text" id="globalSearchInput" class="search-input" placeholder="Поиск людей по @username...">
+                </div>
+            </div>
+
+            <div class="list-scrollable" id="sidebarListContent">
+                <!-- Сюда JS будет рендерить секцию глобального поиска и секцию активных диалогов -->
+            </div>
+        </div>
+
+        <!-- ==========================================================================
+             ГЛАВНОЕ ОКНО ЧАТА
+             ========================================================================== */ -->
+        <div class="chat-main">
+            
+            <!-- Заглушка пустого экрана -->
+            <div class="placeholder-view" id="emptyChatPlaceholder">
+                <p>Выберите, кому хотите написать, или воспользуйтесь поиском</p>
+            </div>
+
+            <!-- Шапка активного диалога -->
+            <div class="chat-header">
+                <div class="active-user-details">
+                    <div class="item-avatar" id="activeChatAvatar">?</div>
+                    <div class="active-user-info">
+                        <h4 id="activeChatTitle">Собеседник</h4>
+                        <p id="activeChatStatus">последний раз видели недавно</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Рабочая область сообщений -->
+            <div class="messages-viewport" id="messagesContainer">
+                <!-- Рендеринг пузырей сообщений -->
+            </div>
+
+            <!-- Нижняя панель отправки -->
+            <div class="chat-input-panel">
+                <input type="text" id="mainMessageInput" class="message-input-node" placeholder="Напишите сообщение..." autocomplete="off">
+                <button id="sendMessageBtn" class="action-send-btn">ОТПРАВИТЬ</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==========================================================================
+         5. ЯДРО СИСТЕМЫ И БИЗНЕС-ЛОГИКА (JAVASCRIPT)
+         ========================================================================== -->
+    <script>
+        /**
+         * КЛАСС СЕТЕВОЙ МАТРИЦЫ (Эмуляция серверного сокета через WebStorage API)
+         */
+        class LocalNetworkCore {
+            constructor() {
+                this.storageKeyUsers = 'tg_sim_users';
+                this.storageKeyPayload = 'tg_sim_packet';
+                this.initSystemStorage();
+            }
+
+            initSystemStorage() {
+                if(!localStorage.getItem(this.storageKeyUsers)) {
+                    localStorage.setItem(this.storageKeyUsers, JSON.stringify(['durov', 'shaurma_club', 'bot_support']));
+                }
+            }
+
+            registerUserOnNode(username) {
+                let currentUsers = JSON.parse(localStorage.getItem(this.storageKeyUsers));
+                username = username.trim().toLowerCase();
+                if(!currentUsers.includes(username)) {
+                    currentUsers.push(username);
+                    localStorage.setItem(this.storageKeyUsers, JSON.stringify(currentUsers));
+                }
+                return username;
+            }
+
+            searchUsersOnNode(query) {
+                let allUsers = JSON.parse(localStorage.getItem(this.storageKeyUsers));
+                query = query.trim().toLowerCase();
+                if(!query) return [];
+                return allUsers.filter(user => user.includes(query));
+            }
+
+            broadcastPacket(packet) {
+                localStorage.setItem(this.storageKeyPayload, JSON.stringify({
+                    id: Math.random().toString(36).substring(2),
+                    timestamp: Date.now(),
+                    ...packet
+                }));
+            }
+
+            listenPackets(callback) {
+                window.addEventListener('storage', (event) => {
+                    if (event.key === this.storageKeyPayload && event.newValue) {
+                        try {
+                            const packet = JSON.parse(event.newValue);
+                            callback(packet);
+                        } catch (e) { console.error("Ошибка парсинга пакета данных сети", e); }
+                    }
+                });
+            }
+        }
+
+        /**
+         * КЛАСС ДАННЫХ ПРИЛОЖЕНИЯ (Менеджер локального хранилища переписок)
+         */
+        class DatabaseManager {
+            constructor(currentUsername) {
+                this.myKey = `tg_history_${currentUsername}`;
+                this.currentUsername = currentUsername;
+            }
+
+            getHistory() {
+                let data = localStorage.getItem(this.myKey);
+                return data ? JSON.parse(data) : {};
+            }
+
+            saveMessage(chatWith, messageObj) {
+                let history = this.getHistory();
+                if(!history[chatWith]) history[chatWith] = [];
+                history[chatWith].push(messageObj);
+                localStorage.setItem(this.myKey, JSON.stringify(history));
+            }
+
+            incrementUnread(chatWith) {
+                let history = this.getHistory();
+                // Для простоты храним флаг метаданных непрочитанных прямо в массиве или структуре
+                // В нашей реализации инкремент завязан на динамический подсчет во фронтенде
+            }
+        }
+
+        /**
+         * ГЕНЕРАТОР ПРЕМИАЛЬНЫХ ВИЗУАЛЬНЫХ ЭЛЕМЕНТОВ
+         */
+        const VisualGenerator = {
+            colors: [
+                '#4a90e2', '#e24a4a', '#46b06a', '#f5a623', 
+                '#7ac1eb', '#b8e986', '#bd10e0', '#9013fe'
+            ],
+            getHashColor(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const index = Math.abs(hash) % this.colors.length;
+                return this.colors[index];
+            },
+            generateAvatarMarkup(username) {
+                const letter = username.charAt(0).toUpperCase();
+                const color = this.getHashColor(username);
+                return `<div class="item-avatar" style="background-color: ${color}">${letter}</div>`;
+            }
+        };
+
+        /**
+         * ГЛАВНЫЙ КОНТРОЛЛЕР ИНТЕРФЕЙСА ПРИЛОЖЕНИЯ (UI Engine)
+         */
+        class ApplicationEngine {
+            constructor() {
+                this.network = new LocalNetworkCore();
+                this.db = null;
+                
+                this.currentUser = '';
+                this.activeChatUser = null;
+                
+                // Кэш для отслеживания непрочитанных писем во время сессии
+                this.sessionUnreadCounters = {};
+
+                this.cacheDOM();
+                this.bindEvents();
+                this.initNetworkListeners();
+            }
+
+            cacheDOM() {
+                this.dom = {
+                    authScreen: document.getElementById('authScreen'),
+                    usernameInput: document.getElementById('usernameInput'),
+                    authSubmitBtn: document.getElementById('authSubmitBtn'),
+                    myAvatarNode: document.getElementById('myAvatarNode'),
+                    myNameNode: document.getElementById('myNameNode'),
+                    globalSearchInput: document.getElementById('globalSearchInput'),
+                    sidebarListContent: document.getElementById('sidebarListContent'),
+                    emptyChatPlaceholder: document.getElementById('emptyChatPlaceholder'),
+                    activeChatAvatar: document.getElementById('activeChatAvatar'),
+                    activeChatTitle: document.getElementById('activeChatTitle'),
+                    activeChatStatus: document.getElementById('activeChatStatus'),
+                    messagesContainer: document.getElementById('messagesContainer'),
+                    mainMessageInput: document.getElementById('mainMessageInput'),
+                    sendMessageBtn: document.getElementById('sendMessageBtn')
+                };
+            }
+
+            bindEvents() {
+                this.dom.authSubmitBtn.addEventListener('click', () => this.handleAuth());
+                this.dom.usernameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleAuth(); });
+                
+                this.dom.sendMessageBtn.addEventListener('click', () => this.executeSendMessage());
+                this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.executeSendMessage(); });
+                
+                this.dom.globalSearchInput.addEventListener('input', (e) => this.renderSidebar(e.target.value));
+
+                // Имитация статуса "печатает..." при вводе букв
+                this.dom.mainMessageInput.addEventListener('input', () => this.broadcastTypingStatus());
+            }
+
+            initNetworkListeners() {
+                this.network.listenPackets((packet) => {
+                    // Игнорируем пакеты, отправленные нами же самими
+                    if (packet.sender === this.currentUser) return;
+
+                    if (packet.type === 'msg' && packet.receiver === this.currentUser) {
+                        this.handleInboundMessage(packet);
+                    } 
+                    else if (packet.type === 'typing' && packet.receiver === this.currentUser) {
+                        this.handleInboundTyping(packet);
+                    }
+                });
+            }
+
+            handleAuth() {
+                const rawUser = this.dom.usernameInput.value.trim();
+                if(!rawUser || rawUser.length < 3) {
+                    alert("Юзернейм должен содержать минимум 3 символа!");
+                    return;
+                }
+
+                this.currentUser = this.network.registerUserOnNode(rawUser);
+                this.db = new DatabaseManager(this.currentUser);
+
+                // Настройка профиля в сайдбаре
+                this.dom.myNameNode.innerText = `@${this.currentUser}`;
+                this.dom.myAvatarNode.innerText = this.currentUser.charAt(0).toUpperCase();
+                this.dom.myAvatarNode.style.backgroundColor = VisualGenerator.getHashColor(this.currentUser);
+
+                // Скрытие экрана логина
+                this.dom.authScreen.style.opacity = 0;
+                setTimeout(() => this.dom.authScreen.style.visibility = 'hidden', 300);
+
+                // Загрузка первичного контента
+                this.renderSidebar();
+                this.initMockSystem();
+            }
+
+            initMockSystem() {
+                // Если истории с ботами еще нет, создаем приветственные сообщения
+                let history = this.db.getHistory();
+                if(Object.keys(history).length === 0) {
+                    this.db.saveMessage('durov', { type: 'in', text: 'Привет! Добро пожаловать в децентрализованный TG-клон. Как тебе архитектура без внешних серверов?', time: '12:00' });
+                    this.db.saveMessage('shaurma_club', { type: 'in', text: 'Бро, привет! Скрутили для тебя сочную премиум-шаурму с двойным сыром. Ждем в гости!', time: '14:24' });
+                    this.renderSidebar();
+                }
+            }
+
+            renderSidebar(filterQuery = '') {
+                let html = '';
+                const history = this.db.getHistory();
+                const activeChats = Object.keys(history);
+
+                // 1. БЛОК ГЛОБАЛЬНОГО ПОИСКА ПО СЕТИ
+                if(filterQuery.trim()) {
+                    const searchResults = this.network.searchUsersOnNode(filterQuery);
+                    html += `<div class="section-title">Глобальный поиск</div>`;
+                    if(searchResults.length === 0) {
+                        html += `<div style="padding:15px; font-size:0.85rem; color:var(--text-muted)">Пользователей не найдено</div>`;
+                    } else {
+                        searchResults.forEach(user => {
+                            if(user === this.currentUser) return;
+                            html += `
+                                <div class="chat-item" onclick="window.app.selectChat('${user}')">
+                                    ${VisualGenerator.generateAvatarMarkup(user)}
+                                    <div class="item-content">
+                                        <div class="item-name">@${user}</div>
+                                        <div class="item-preview">Нажмите, чтобы начать диалог</div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                }
+
+                // 2. БЛОК АКТИВНЫХ ДИАЛОГОВ
+                html += `<div class="section-title">Чаты и контакты</div>`;
+                
+                // Фильтруем список активных чатов, если введен поисковой запрос
+                const displayedChats = activeChats.filter(chatUser => {
+                    if(!filterQuery.trim()) return true;
+                    return chatUser.includes(filterQuery.trim().toLowerCase());
+                });
+
+                if(displayedChats.length === 0 && !filterQuery.trim()) {
+                    html += `<div style="padding:15px; font-size:0.85rem; color:var(--text-muted)">Нет активных диалогов. Найдите кого-нибудь через поиск сверху!</div>`;
+                } else {
+                    displayedChats.forEach(chatUser => {
+                        const messages = history[chatUser] || [];
+                        const lastMsg = messages[messages.length - 1];
+                        const lastText = lastMsg ? lastMsg.text : 'Нет сообщений';
+                        const lastTime = lastMsg ? lastMsg.time : '';
+                        const unreadCount = this.sessionUnreadCounters[chatUser] || 0;
+                        const activeClass = (this.activeChatUser === chatUser) ? 'active' : '';
+
+                        html += `
+                            <div class="chat-item ${activeClass}" id="chatItem_${chatUser}" onclick="window.app.selectChat('${chatUser}')">
+                                ${VisualGenerator.generateAvatarMarkup(chatUser)}
+                                <div class="item-content">
+                                    <div class="item-meta">
+                                        <span class="item-name">@${chatUser}</span>
+                                        <span class="item-time">${lastTime}</span>
+                                    </div>
+                                    <div class="item-bottom">
+                                        <span class="item-preview" id="preview_${chatUser}">${lastText}</span>
+                                        ${unreadCount > 0 ? `<span class="badge-unread">${unreadCount}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                this.dom.sidebarListContent.innerHTML = html;
+            }
+
+            selectChat(username) {
+                this.activeChatUser = username;
+                this.sessionUnreadCounters[username] = 0; // Обнуляем счетчик непрочитанных
+
+                // Убираем заглушку экрана
+                this.dom.emptyChatPlaceholder.style.display = 'none';
+
+                // Обновляем шапку чата
+                this.dom.activeChatTitle.innerText = `@${username}`;
+                this.dom.activeChatAvatar.innerText = username.charAt(0).toUpperCase();
+                this.dom.activeChatAvatar.style.backgroundColor = VisualGenerator.getHashColor(username);
+                this.dom.activeChatStatus.innerText = 'в сети';
+                this.dom.activeChatStatus.style.color = 'var(--text-muted)';
+
+                // Очищаем инпут и фокусим его
+                this.dom.mainMessageInput.value = '';
+                this.dom.mainMessageInput.focus();
+
+                // Рендерим сообщения и обновляем сайдбар для сброса бейджей
+                this.renderMessagesView();
+                this.renderSidebar(this.dom.globalSearchInput.value);
+            }
+
+            renderMessagesView() {
+                if(!this.activeChatUser) return;
+                
+                const history = this.db.getHistory();
+                const messages = history[this.activeChatUser] || [];
+                
+                let html = '';
+                messages.forEach(msg => {
+                    const directionClass = (msg.type === 'out') ? 'outbound' : 'inbound';
+                    html += `
+                        <div class="msg-bubble ${directionClass}">
+                            ${msg.text}
+                            <span class="msg-timestamp">${msg.time}</span>
+                        </div>
+                    `;
+                });
+
+                this.dom.messagesContainer.innerHTML = html;
+                this.dom.messagesContainer.scrollTop = this.dom.messagesContainer.scrollHeight;
+            }
+
+            executeSendMessage() {
+                const text = this.dom.mainMessageInput.value.trim();
+                if(!text || !this.activeChatUser) return;
+
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                const messagePayload = {
+                    type: 'out',
+                    text: text,
+                    time: timeStr
+                };
+
+                // Сохраняем в локальную БД себе
+                this.db.saveMessage(this.activeChatUser, messagePayload);
+
+                // Публикуем пакет в виртуальную сеть для второй вкладки
+                this.network.broadcastPacket({
+                    type: 'msg',
+                    sender: this.currentUser,
+                    receiver: this.activeChatUser,
+                    text: text,
+                    time: timeStr
+                });
+
+                this.dom.mainMessageInput.value = '';
+                this.renderMessagesView();
+                this.renderSidebar(this.dom.globalSearchInput.value);
+
+                // Ответная реакция встроенных системных ботов
+                this.triggerBotResponseIfNeeded(text);
+            }
+
+            handleInboundMessage(packet) {
+                // Сохраняем входящее сообщение от другого юзера в локальную БД
+                this.db.saveMessage(packet.sender, {
+                    type: 'in',
+                    text: packet.text,
+                    time: packet.time
+                });
+
+                // Если у нас открыт этот чат — сразу рендерим
+                if (this.activeChatUser === packet.sender) {
+                    this.renderMessagesView();
+                } else {
+                    // Иначе увеличиваем счетчик непрочитанных
+                    this.sessionUnreadCounters[packet.sender] = (this.sessionUnreadCounters[packet.sender] || 0) + 1;
+                }
+                this.renderSidebar(this.dom.globalSearchInput.value);
+            }
+
+            broadcastTypingStatus() {
+                if(!this.activeChatUser) return;
+                this.network.broadcastPacket({
+                    type: 'typing',
+                    sender: this.currentUser,
+                    receiver: this.activeChatUser
+                });
+            }
+
+            handleInboundTyping(packet) {
+                const previewNode = document.getElementById(`preview_${packet.sender}`);
+                if (previewNode) {
+                    const oldText = previewNode.innerText;
+                    const oldClass = previewNode.className;
+                    
+                    previewNode.innerText = 'печатает...';
+                    previewNode.className = 'item-preview typing';
+
+                    if(this.activeChatUser === packet.sender) {
+                        this.dom.activeChatStatus.innerText = 'печатает...';
+                        this.dom.activeChatStatus.style.color = 'var(--success)';
+                    }
+
+                    // Сбрасываем статус через 2 секунды затухания
+                    clearTimeout(previewNode.typingTimeout);
+                    previewNode.typingTimeout = setTimeout(() => {
+                        previewNode.innerText = oldText;
+                        previewNode.className = oldClass;
+                        if(this.activeChatUser === packet.sender) {
+                            this.dom.activeChatStatus.innerText = 'в сети';
+                            this.dom.activeChatStatus.style.color = 'var(--text-muted)';
+                        }
+                    }, 2000);
+                }
+            }
+
+            triggerBotResponseIfNeeded(userText) {
+                // Логика автоответов для локальных ботов-заглушек
+                const bot = this.activeChatUser;
+                if (bot !== 'durov' && bot !== 'shaurma_club' && bot !== 'bot_support') return;
+
+                setTimeout(() => {
+                    this.network.broadcastPacket({
+                        type: 'typing',
+                        sender: bot,
+                        receiver: this.currentUser
+                    });
+                }, 600);
+
+                setTimeout(() => {
+                    let answer = "Я зафиксировал ваш пакет данных. Разработка архитектуры продолжается!";
+                    if(bot === 'durov') {
+                        answer = "Отличный код! Главное — помни про свободу данных и приватность ключей. Стену возвращать не будем.";
+                    } else if(bot === 'shaurma_club') {
+                        answer = "Ваш заказ на сочную шаурму принят! Специи добавлены, соус уже на лаваше. Приезжайте забирать!";
+                    }
+
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    this.handleInboundMessage({
+                        type: 'msg',
+                        sender: bot,
+                        receiver: this.currentUser,
+                        text: answer,
+                        time: timeStr
+                    });
+                }, 2200);
+            }
+        }
+
+        // Запуск ядра приложения при парсинге дерева документа
+        window.app = new ApplicationEngine();
+    </script>
+</body>
+</html>
