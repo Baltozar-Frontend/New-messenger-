@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram X-Premium Clone</title>
+    <title>Telegram X-Premium Clone | FIXED v2</title>
     <style>
         /* ==========================================================================
            1. ПЕРЕМЕННЫЕ И ОБНУЛЕНИЕ СТИЛЕЙ
@@ -493,9 +493,7 @@
 
     <div class="app-wrapper">
 
-        <!-- ==========================================================================
-             БЛОК АВТОРИЗАЦИИ
-             ========================================================================== */ -->
+        <!-- БЛОК АВТОРИЗАЦИИ -->
         <div class="auth-overlay" id="authScreen">
             <div class="auth-card">
                 <div class="auth-logo">✈</div>
@@ -509,9 +507,7 @@
             </div>
         </div>
 
-        <!-- ==========================================================================
-             САЙДБАР (СПИСОК ЧАТОВ И ПОИСК)
-             ========================================================================== */ -->
+        <!-- САЙДБАР (СПИСОК ЧАТОВ И ПОИСК) -->
         <div class="sidebar">
             <div class="sidebar-header">
                 <div class="profile-title">
@@ -527,13 +523,11 @@
             </div>
 
             <div class="list-scrollable" id="sidebarListContent">
-                <!-- Сюда JS будет рендерить секцию глобального поиска и секцию активных диалогов -->
+                <!-- Контент генерируется через JavaScript -->
             </div>
         </div>
 
-        <!-- ==========================================================================
-             ГЛАВНОЕ ОКНО ЧАТА
-             ========================================================================== */ -->
+        <!-- ГЛАВНОЕ ОКНО ЧАТА -->
         <div class="chat-main">
             
             <!-- Заглушка пустого экрана -->
@@ -554,7 +548,7 @@
 
             <!-- Рабочая область сообщений -->
             <div class="messages-viewport" id="messagesContainer">
-                <!-- Рендеринг пузырей сообщений -->
+                <!-- Пузыри сообщений -->
             </div>
 
             <!-- Нижняя панель отправки -->
@@ -566,9 +560,7 @@
 
     </div>
 
-    <!-- ==========================================================================
-         5. ЯДРО СИСТЕМЫ И БИЗНЕС-ЛОГИКА (JAVASCRIPT)
-         ========================================================================== -->
+    <!-- BUSINESS LOGIC & SIMULATION ENGINE -->
     <script>
         /**
          * КЛАСС СЕТЕВОЙ МАТРИЦЫ (Эмуляция серверного сокета через WebStorage API)
@@ -577,6 +569,7 @@
             constructor() {
                 this.storageKeyUsers = 'tg_sim_users';
                 this.storageKeyPayload = 'tg_sim_packet';
+                this.packetCallback = null;
                 this.initSystemStorage();
             }
 
@@ -604,27 +597,37 @@
             }
 
             broadcastPacket(packet) {
-                localStorage.setItem(this.storageKeyPayload, JSON.stringify({
+                const fullPacket = {
                     id: Math.random().toString(36).substring(2),
                     timestamp: Date.now(),
                     ...packet
-                }));
+                };
+                
+                // Записываем в localStorage для других вкладок
+                localStorage.setItem(this.storageKeyPayload, JSON.stringify(fullPacket));
+                
+                // ФИКС ДОСТАВКИ: Принудительно триггерим обработчик на текущей вкладке,
+                // так как событие 'storage' нативно работает только для СОСЕДНИХ окон.
+                if(this.packetCallback) {
+                    setTimeout(() => this.packetCallback(fullPacket), 10);
+                }
             }
 
             listenPackets(callback) {
+                this.packetCallback = callback;
                 window.addEventListener('storage', (event) => {
                     if (event.key === this.storageKeyPayload && event.newValue) {
                         try {
                             const packet = JSON.parse(event.newValue);
-                            callback(packet);
-                        } catch (e) { console.error("Ошибка парсинга пакета данных сети", e); }
+                            this.packetCallback(packet);
+                        } catch (e) { console.error("Ошибка сети:", e); }
                     }
                 });
             }
         }
 
         /**
-         * КЛАСС ДАННЫХ ПРИЛОЖЕНИЯ (Менеджер локального хранилища переписок)
+         * КЛАСС ДАННЫХ ПРИЛОЖЕНИЯ (Менеджер истории переписок в LocalStorage)
          */
         class DatabaseManager {
             constructor(currentUsername) {
@@ -643,29 +646,19 @@
                 history[chatWith].push(messageObj);
                 localStorage.setItem(this.myKey, JSON.stringify(history));
             }
-
-            incrementUnread(chatWith) {
-                let history = this.getHistory();
-                // Для простоты храним флаг метаданных непрочитанных прямо в массиве или структуре
-                // В нашей реализации инкремент завязан на динамический подсчет во фронтенде
-            }
         }
 
         /**
-         * ГЕНЕРАТОР ПРЕМИАЛЬНЫХ ВИЗУАЛЬНЫХ ЭЛЕМЕНТОВ
+         * ГЕНЕРАТОР ВИЗУАЛОВ
          */
         const VisualGenerator = {
-            colors: [
-                '#4a90e2', '#e24a4a', '#46b06a', '#f5a623', 
-                '#7ac1eb', '#b8e986', '#bd10e0', '#9013fe'
-            ],
+            colors: ['#4a90e2', '#e24a4a', '#46b06a', '#f5a623', '#7ac1eb', '#b8e986', '#bd10e0', '#9013fe'],
             getHashColor(str) {
                 let hash = 0;
                 for (let i = 0; i < str.length; i++) {
                     hash = str.charCodeAt(i) + ((hash << 5) - hash);
                 }
-                const index = Math.abs(hash) % this.colors.length;
-                return this.colors[index];
+                return this.colors[Math.abs(hash) % this.colors.length];
             },
             generateAvatarMarkup(username) {
                 const letter = username.charAt(0).toUpperCase();
@@ -675,22 +668,22 @@
         };
 
         /**
-         * ГЛАВНЫЙ КОНТРОЛЛЕР ИНТЕРФЕЙСА ПРИЛОЖЕНИЯ (UI Engine)
+         * ГЛАВНЫЙ ДВИЖОК ИНТЕРФЕЙСА
          */
         class ApplicationEngine {
             constructor() {
                 this.network = new LocalNetworkCore();
                 this.db = null;
-                
                 this.currentUser = '';
                 this.activeChatUser = null;
-                
-                // Кэш для отслеживания непрочитанных писем во время сессии
                 this.sessionUnreadCounters = {};
 
                 this.cacheDOM();
                 this.bindEvents();
                 this.initNetworkListeners();
+                
+                // ПРОВЕРКА СЕССИИ: Автоматический вход после перезагрузки
+                this.checkActiveSession();
             }
 
             cacheDOM() {
@@ -715,19 +708,14 @@
             bindEvents() {
                 this.dom.authSubmitBtn.addEventListener('click', () => this.handleAuth());
                 this.dom.usernameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleAuth(); });
-                
                 this.dom.sendMessageBtn.addEventListener('click', () => this.executeSendMessage());
                 this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.executeSendMessage(); });
-                
                 this.dom.globalSearchInput.addEventListener('input', (e) => this.renderSidebar(e.target.value));
-
-                // Имитация статуса "печатает..." при вводе букв
                 this.dom.mainMessageInput.addEventListener('input', () => this.broadcastTypingStatus());
             }
 
             initNetworkListeners() {
                 this.network.listenPackets((packet) => {
-                    // Игнорируем пакеты, отправленные нами же самими
                     if (packet.sender === this.currentUser) return;
 
                     if (packet.type === 'msg' && packet.receiver === this.currentUser) {
@@ -739,6 +727,15 @@
                 });
             }
 
+            checkActiveSession() {
+                const savedUser = sessionStorage.getItem('tg_active_session_user');
+                if (savedUser) {
+                    this.setupUserSession(savedUser);
+                    // Скрываем экран авторизации без анимации, так как сессия уже валидна
+                    this.dom.authScreen.style.display = 'none';
+                }
+            }
+
             handleAuth() {
                 const rawUser = this.dom.usernameInput.value.trim();
                 if(!rawUser || rawUser.length < 3) {
@@ -746,29 +743,34 @@
                     return;
                 }
 
-                this.currentUser = this.network.registerUserOnNode(rawUser);
+                const cleanUser = this.network.registerUserOnNode(rawUser);
+                
+                // Сохраняем сессию в контексте вкладки браузера
+                sessionStorage.setItem('tg_active_session_user', cleanUser);
+                
+                this.setupUserSession(cleanUser);
+
+                this.dom.authScreen.style.opacity = 0;
+                setTimeout(() => this.dom.authScreen.style.visibility = 'hidden', 300);
+            }
+
+            setupUserSession(username) {
+                this.currentUser = username;
                 this.db = new DatabaseManager(this.currentUser);
 
-                // Настройка профиля в сайдбаре
                 this.dom.myNameNode.innerText = `@${this.currentUser}`;
                 this.dom.myAvatarNode.innerText = this.currentUser.charAt(0).toUpperCase();
                 this.dom.myAvatarNode.style.backgroundColor = VisualGenerator.getHashColor(this.currentUser);
 
-                // Скрытие экрана логина
-                this.dom.authScreen.style.opacity = 0;
-                setTimeout(() => this.dom.authScreen.style.visibility = 'hidden', 300);
-
-                // Загрузка первичного контента
                 this.renderSidebar();
                 this.initMockSystem();
             }
 
             initMockSystem() {
-                // Если истории с ботами еще нет, создаем приветственные сообщения
                 let history = this.db.getHistory();
                 if(Object.keys(history).length === 0) {
-                    this.db.saveMessage('durov', { type: 'in', text: 'Привет! Добро пожаловать в децентрализованный TG-клон. Как тебе архитектура без внешних серверов?', time: '12:00' });
-                    this.db.saveMessage('shaurma_club', { type: 'in', text: 'Бро, привет! Скрутили для тебя сочную премиум-шаурму с двойным сыром. Ждем в гости!', time: '14:24' });
+                    this.db.saveMessage('durov', { type: 'in', text: 'Привет! Добро пожаловать в локальный ТГ чат. Попробуй открыть меня в двух окнах!', time: '12:00' });
+                    this.db.saveMessage('shaurma_club', { type: 'in', text: 'Бро, привет! Скрутили для тебя сочную шаурму с двойным сыром. Ждем!', time: '14:24' });
                     this.renderSidebar();
                 }
             }
@@ -778,17 +780,21 @@
                 const history = this.db.getHistory();
                 const activeChats = Object.keys(history);
 
-                // 1. БЛОК ГЛОБАЛЬНОГО ПОИСКА ПО СЕТИ
-                if(filterQuery.trim()) {
-                    const searchResults = this.network.searchUsersOnNode(filterQuery);
+                const cleanQuery = filterQuery.replace('@', '').trim().toLowerCase();
+
+                // 1. БЛОК ГЛОБАЛЬНОГО ПОИСКА ПО ВСЕЙ СЕТИ
+                if(cleanQuery) {
+                    const searchResults = this.network.searchUsersOnNode(cleanQuery);
                     html += `<div class="section-title">Глобальный поиск</div>`;
-                    if(searchResults.length === 0) {
+                    
+                    const filteredResults = searchResults.filter(user => user !== this.currentUser);
+
+                    if(filteredResults.length === 0) {
                         html += `<div style="padding:15px; font-size:0.85rem; color:var(--text-muted)">Пользователей не найдено</div>`;
                     } else {
-                        searchResults.forEach(user => {
-                            if(user === this.currentUser) return;
+                        filteredResults.forEach(user => {
                             html += `
-                                <div class="chat-item" onclick="window.app.selectChat('${user}')">
+                                <div class="chat-item" onclick="window.appEngineInstance.selectChat('${user}')">
                                     ${VisualGenerator.generateAvatarMarkup(user)}
                                     <div class="item-content">
                                         <div class="item-name">@${user}</div>
@@ -803,14 +809,13 @@
                 // 2. БЛОК АКТИВНЫХ ДИАЛОГОВ
                 html += `<div class="section-title">Чаты и контакты</div>`;
                 
-                // Фильтруем список активных чатов, если введен поисковой запрос
                 const displayedChats = activeChats.filter(chatUser => {
-                    if(!filterQuery.trim()) return true;
-                    return chatUser.includes(filterQuery.trim().toLowerCase());
+                    if(!cleanQuery) return true;
+                    return chatUser.includes(cleanQuery);
                 });
 
-                if(displayedChats.length === 0 && !filterQuery.trim()) {
-                    html += `<div style="padding:15px; font-size:0.85rem; color:var(--text-muted)">Нет активных диалогов. Найдите кого-нибудь через поиск сверху!</div>`;
+                if(displayedChats.length === 0 && !cleanQuery) {
+                    html += `<div style="padding:15px; font-size:0.85rem; color:var(--text-muted)">Нет активных диалогов. Введите ник в поиск!</div>`;
                 } else {
                     displayedChats.forEach(chatUser => {
                         const messages = history[chatUser] || [];
@@ -821,7 +826,7 @@
                         const activeClass = (this.activeChatUser === chatUser) ? 'active' : '';
 
                         html += `
-                            <div class="chat-item ${activeClass}" id="chatItem_${chatUser}" onclick="window.app.selectChat('${chatUser}')">
+                            <div class="chat-item ${activeClass}" id="chatItem_${chatUser}" onclick="window.appEngineInstance.selectChat('${chatUser}')">
                                 ${VisualGenerator.generateAvatarMarkup(chatUser)}
                                 <div class="item-content">
                                     <div class="item-meta">
@@ -843,23 +848,24 @@
 
             selectChat(username) {
                 this.activeChatUser = username;
-                this.sessionUnreadCounters[username] = 0; // Обнуляем счетчик непрочитанных
+                this.sessionUnreadCounters[username] = 0;
 
-                // Убираем заглушку экрана
                 this.dom.emptyChatPlaceholder.style.display = 'none';
 
-                // Обновляем шапку чата
                 this.dom.activeChatTitle.innerText = `@${username}`;
                 this.dom.activeChatAvatar.innerText = username.charAt(0).toUpperCase();
                 this.dom.activeChatAvatar.style.backgroundColor = VisualGenerator.getHashColor(username);
                 this.dom.activeChatStatus.innerText = 'в сети';
                 this.dom.activeChatStatus.style.color = 'var(--text-muted)';
 
-                // Очищаем инпут и фокусим его
+                let history = this.db.getHistory();
+                if (!history[username]) {
+                    this.db.saveMessage(username, { type: 'system_init', text: 'Начало безопасного диалога', time: '' });
+                }
+
                 this.dom.mainMessageInput.value = '';
                 this.dom.mainMessageInput.focus();
 
-                // Рендерим сообщения и обновляем сайдбар для сброса бейджей
                 this.renderMessagesView();
                 this.renderSidebar(this.dom.globalSearchInput.value);
             }
@@ -872,6 +878,7 @@
                 
                 let html = '';
                 messages.forEach(msg => {
+                    if (msg.type === 'system_init') return; 
                     const directionClass = (msg.type === 'out') ? 'outbound' : 'inbound';
                     html += `
                         <div class="msg-bubble ${directionClass}">
@@ -890,17 +897,10 @@
                 if(!text || !this.activeChatUser) return;
 
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                const messagePayload = {
-                    type: 'out',
-                    text: text,
-                    time: timeStr
-                };
+                const messagePayload = { type: 'out', text: text, time: timeStr };
 
-                // Сохраняем в локальную БД себе
                 this.db.saveMessage(this.activeChatUser, messagePayload);
 
-                // Публикуем пакет в виртуальную сеть для второй вкладки
                 this.network.broadcastPacket({
                     type: 'msg',
                     sender: this.currentUser,
@@ -913,23 +913,15 @@
                 this.renderMessagesView();
                 this.renderSidebar(this.dom.globalSearchInput.value);
 
-                // Ответная реакция встроенных системных ботов
                 this.triggerBotResponseIfNeeded(text);
             }
 
             handleInboundMessage(packet) {
-                // Сохраняем входящее сообщение от другого юзера в локальную БД
-                this.db.saveMessage(packet.sender, {
-                    type: 'in',
-                    text: packet.text,
-                    time: packet.time
-                });
+                this.db.saveMessage(packet.sender, { type: 'in', text: packet.text, time: packet.time });
 
-                // Если у нас открыт этот чат — сразу рендерим
                 if (this.activeChatUser === packet.sender) {
                     this.renderMessagesView();
                 } else {
-                    // Иначе увеличиваем счетчик непрочитанных
                     this.sessionUnreadCounters[packet.sender] = (this.sessionUnreadCounters[packet.sender] || 0) + 1;
                 }
                 this.renderSidebar(this.dom.globalSearchInput.value);
@@ -958,7 +950,6 @@
                         this.dom.activeChatStatus.style.color = 'var(--success)';
                     }
 
-                    // Сбрасываем статус через 2 секунды затухания
                     clearTimeout(previewNode.typingTimeout);
                     previewNode.typingTimeout = setTimeout(() => {
                         previewNode.innerText = oldText;
@@ -972,24 +963,19 @@
             }
 
             triggerBotResponseIfNeeded(userText) {
-                // Логика автоответов для локальных ботов-заглушек
                 const bot = this.activeChatUser;
                 if (bot !== 'durov' && bot !== 'shaurma_club' && bot !== 'bot_support') return;
 
                 setTimeout(() => {
-                    this.network.broadcastPacket({
-                        type: 'typing',
-                        sender: bot,
-                        receiver: this.currentUser
-                    });
+                    this.network.broadcastPacket({ type: 'typing', sender: bot, receiver: this.currentUser });
                 }, 600);
 
                 setTimeout(() => {
-                    let answer = "Я зафиксировал ваш пакет данных. Разработка архитектуры продолжается!";
+                    let answer = "Я зафиксировал ваш пакет данных. Локальный узел работает стабильно!";
                     if(bot === 'durov') {
-                        answer = "Отличный код! Главное — помни про свободу данных и приватность ключей. Стену возвращать не будем.";
+                        answer = "Отличная работа над ошибками! Настоящий разработчик всегда проверяет имена инстансов. Стену, кстати, я все равно не верну.";
                     } else if(bot === 'shaurma_club') {
-                        answer = "Ваш заказ на сочную шаурму принят! Специи добавлены, соус уже на лаваше. Приезжайте забирать!";
+                        answer = "Рецепт обновлен! Наша шаурма теперь компилируется без багов и подается горячей. Приятного аппетита!";
                     }
 
                     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1004,8 +990,7 @@
             }
         }
 
-        // Запуск ядра приложения при парсинге дерева документа
-        window.app = new ApplicationEngine();
+        window.appEngineInstance = new ApplicationEngine();
     </script>
 </body>
 </html>
