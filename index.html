@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Secure Web Messenger (Video & Read Receipts)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Secure Web Messenger (iPhone 13 Fixed)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -29,8 +29,25 @@
             --warning: #f5a623;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; width: 100vw; overflow: hidden; display: flex; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        
+        /* Исправление 100vh под iOS (используем 100dvh) */
+        body { 
+            background-color: var(--bg-main); 
+            color: var(--text-main); 
+            height: 100vh;
+            height: 100dvh; 
+            width: 100vw; 
+            overflow: hidden; 
+            display: flex; 
+        }
+        
         .app-wrapper { display: flex; width: 100%; height: 100%; position: relative; }
 
         /* Авторизация */
@@ -91,19 +108,46 @@
         .msg-bubble.inbound .video-circle { border-color: var(--bg-msg-in); }
         .msg-bubble.outbound .video-circle { border-color: var(--bg-msg-out); }
         
-        /* Панель ввода */
-        .chat-input-panel { background-color: var(--bg-sidebar); padding: 10px 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); position: relative; }
+        /* Панель ввода с учетом безопасной зоны iPhone 13 */
+        .chat-input-panel { 
+            background-color: var(--bg-sidebar); 
+            padding: 10px 15px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            border-top: 1px solid var(--border); 
+            position: relative; 
+        }
         .message-input-node { flex: 1; padding: 12px; background-color: var(--bg-input); border: none; border-radius: 8px; color: var(--text-main); outline: none; font-size: 0.95rem; }
         
-        /* Кнопка записи/отправки */
-        .action-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--bg-input); border: none; color: var(--accent); font-size: 1.2rem; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s; user-select: none; outline: none; }
+        /* Кнопка записи/отправки: убираем жесты iOS */
+        .action-btn { 
+            width: 44px; 
+            height: 44px; 
+            border-radius: 50%; 
+            background: var(--bg-input); 
+            border: none; 
+            color: var(--accent); 
+            font-size: 1.2rem; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            outline: none; 
+            flex-shrink: 0;
+            -webkit-touch-callout: none; /* Блокирует меню Apple при зажатии */
+            -webkit-user-select: none;   /* Блокирует выделение эмодзи */
+            user-select: none;
+        }
         .action-btn:active { transform: scale(0.9); }
         .action-btn.recording { background: var(--danger); color: #fff; animation: pulseRecord 1s infinite; transform: scale(1.2); }
         
         @keyframes pulseRecord { 0% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(226, 74, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0); } }
 
         /* Плашка записи видео */
-        .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.7); padding: 5px 12px; border-radius: 15px; font-size: 0.8rem; display: none; align-items: center; gap: 6px; }
+        .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.7); padding: 5px 12px; border-radius: 15px; font-size: 0.8rem; display: none; align-items: center; gap: 6px; z-index: 20; }
         .recording-status.active { display: flex; }
         .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite alternate; }
 
@@ -165,7 +209,6 @@
     </div>
 
     <script>
-        // Утилита для генерации уникальных ID сообщений (для статуса "прочитано")
         const generateID = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
         /** СЕТЕВОЙ ДВИЖОК */
@@ -197,7 +240,6 @@
                 this.client.on('message', (topic, message) => this.handleRawMessage(message.toString()));
             }
 
-            // Отправка данных (текст, видео или системный сигнал прочитанности)
             sendPacket(receiver, msgObj) {
                 if (!this.isConnected) return false;
                 const payload = { s: this.currentUser, r: receiver, ...msgObj };
@@ -307,13 +349,13 @@
                 });
                 this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleActionBtnClick(); });
 
-                // Управление кнопкой Запись/Отправка (поддержка мыши и тач-событий)
+                // Исправленные тач-события для iOS iPhone 13
                 this.dom.actionBtn.addEventListener('mousedown', (e) => this.handleActionDown(e));
                 this.dom.actionBtn.addEventListener('touchstart', (e) => this.handleActionDown(e), {passive: false});
                 
                 window.addEventListener('mouseup', () => this.handleActionUp());
                 window.addEventListener('touchend', () => this.handleActionUp());
-                this.dom.actionBtn.oncontextmenu = () => false; // отключаем меню по долгому тапу
+                this.dom.actionBtn.oncontextmenu = (e) => { e.preventDefault(); return false; }; 
             }
 
             setupUserSession(username) {
@@ -370,10 +412,9 @@
                 this.dom.emptyChatPlaceholder.style.display = 'none';
                 this.dom.activeChatTitle.innerText = `@${username}`;
                 this.dom.activeChatAvatar.outerHTML = VisualGen.getAvatar(username);
-                this.dom.activeChatAvatar = document.querySelector('.chat-header .item-avatar'); // update ref
+                this.dom.activeChatAvatar = document.querySelector('.chat-header .item-avatar'); 
                 this.dom.appWrapper.classList.add('chat-opened');
                 
-                // Проверяем непрочитанные входящие и шлем ACK собеседнику
                 const unreadIds = this.db.markAllAsReadByMe(username);
                 if (unreadIds.length > 0) {
                     this.network.sendPacket(username, { type: 'read_ack', ids: unreadIds });
@@ -390,11 +431,8 @@
                 
                 messages.forEach(msg => {
                     const dir = msg.type === 'out' ? 'outbound' : 'inbound';
-                    
-                    // Галочки для исходящих
                     const ticks = msg.type === 'out' ? `<span class="msg-ticks">${msg.isRead ? '✓✓' : '✓'}</span>` : '';
                     
-                    // Контент (Текст или Кружок)
                     const content = msg.msgType === 'video' 
                         ? `<div class="video-circle-container"><video class="video-circle" src="${msg.text}" autoplay loop muted playsinline></video></div>` 
                         : msg.text;
@@ -413,9 +451,8 @@
                 this.dom.messagesContainer.scrollTop = this.dom.messagesContainer.scrollHeight;
             }
 
-            // Управление вводом
             handleActionDown(e) {
-                if (e.type === 'touchstart') e.preventDefault(); // Предотвращаем двойное срабатывание
+                if (e.type === 'touchstart') e.preventDefault(); 
                 if (this.dom.mainMessageInput.value.trim()) {
                     this.sendTextMessage();
                 } else {
@@ -455,7 +492,6 @@
                 }
             }
 
-            // МАГИЯ КРУЖОЧКОВ (MediaRecorder API)
             async startVideoRecording() {
                 if(!this.activeChatUser) return;
                 try {
@@ -474,19 +510,18 @@
                     
                     this.mediaRecorder.onstop = () => {
                         const blob = new Blob(this.videoChunks, { type: 'video/webm' });
-                        // Конвертируем Blob в Base64 чтобы отправить по сети
                         const reader = new FileReader();
                         reader.readAsDataURL(blob);
                         reader.onloadend = () => {
                             const base64Video = reader.result;
                             this.executeSend('video', base64Video);
                         };
-                        stream.getTracks().forEach(t => t.stop()); // Выключаем камеру
+                        stream.getTracks().forEach(t => t.stop()); 
                     };
                     
                     this.mediaRecorder.start();
                 } catch (err) {
-                    alert("Нет доступа к камере/микрофону! Откройте сайт по HTTPS.");
+                    alert("Нет доступа к камере! Проверьте, что сайт открыт через HTTPS-соединение.");
                 }
             }
 
@@ -500,16 +535,13 @@
             }
 
             handleNetworkPacket(packet) {
-                // Обработка пакета "Прочитано" (две галочки)
                 if (packet.type === 'read_ack') {
                     this.db.markAsReadByThem(packet.s, packet.ids);
                     if (this.activeChatUser === packet.s) this.renderMessagesView();
                     return;
                 }
 
-                // Обработка входящего сообщения (текст или видео)
                 if (packet.type === 'msg') {
-                    // Если чат сейчас открыт, сразу помечаем прочитанным и шлем ACK обратно
                     let isRead = (this.activeChatUser === packet.s);
                     this.db.saveMessage(packet.s, { id: packet.id, type: 'in', msgType: packet.msgType, text: packet.text, time: packet.time, isRead: isRead });
                     
