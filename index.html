@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Secure Web Messenger (iPhone 13 Fixed)</title>
+    <title>Secure Web Messenger (iPhone 13 Ultra Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -37,7 +37,6 @@
             -webkit-tap-highlight-color: transparent; 
         }
         
-        /* Исправление 100vh под iOS (используем 100dvh) */
         body { 
             background-color: var(--bg-main); 
             color: var(--text-main); 
@@ -87,9 +86,9 @@
         .badge-unread { background-color: var(--accent); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 10px; }
 
         /* Окно чата */
-        .chat-main { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-chat); position: relative; }
+        .chat-main { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-chat); position: relative; height: 100%; }
         .placeholder-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-main); display: flex; justify-content: center; align-items: center; z-index: 5; }
-        .chat-header { height: 55px; background-color: var(--bg-sidebar); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; gap: 10px; }
+        .chat-header { height: 55px; background-color: var(--bg-sidebar); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0; }
         .back-btn { display: none; background: none; border: none; color: var(--accent); font-size: 1.4rem; cursor: pointer; padding: 4px 8px; margin-right: 5px; }
         .active-user-info h4 { font-size: 0.9rem; font-weight: 600; }
         .messages-viewport { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
@@ -108,51 +107,53 @@
         .msg-bubble.inbound .video-circle { border-color: var(--bg-msg-in); }
         .msg-bubble.outbound .video-circle { border-color: var(--bg-msg-out); }
         
-        /* Панель ввода с учетом безопасной зоны iPhone 13 */
+        /* Мощное исправление привязки под Safari iOS */
         .chat-input-panel { 
             background-color: var(--bg-sidebar); 
             padding: 10px 15px;
             padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
             display: flex; 
             align-items: center; 
-            gap: 10px; 
+            gap: 12px; 
             border-top: 1px solid var(--border); 
-            position: relative; 
+            position: relative;
+            flex-shrink: 0;
+            z-index: 10;
         }
         .message-input-node { flex: 1; padding: 12px; background-color: var(--bg-input); border: none; border-radius: 8px; color: var(--text-main); outline: none; font-size: 0.95rem; }
         
-        /* Кнопка записи/отправки: убираем жесты iOS */
+        /* Новая кнопка действия с SVG-поддержкой вместо ломающихся эмодзи */
         .action-btn { 
             width: 44px; 
             height: 44px; 
             border-radius: 50%; 
-            background: var(--bg-input); 
+            background: var(--accent); 
             border: none; 
-            color: var(--accent); 
-            font-size: 1.2rem; 
+            color: #fff; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
             cursor: pointer; 
-            transition: all 0.2s; 
+            transition: all 0.2s ease; 
             outline: none; 
             flex-shrink: 0;
-            -webkit-touch-callout: none; /* Блокирует меню Apple при зажатии */
-            -webkit-user-select: none;   /* Блокирует выделение эмодзи */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
             user-select: none;
         }
-        .action-btn:active { transform: scale(0.9); }
-        .action-btn.recording { background: var(--danger); color: #fff; animation: pulseRecord 1s infinite; transform: scale(1.2); }
+        .action-btn svg { width: 22px; height: 22px; fill: currentColor; display: block; }
+        .action-btn:active, .action-btn.ios-active { transform: scale(0.9); background: var(--accent-hover); }
+        .action-btn.recording { background: var(--danger) !important; color: #fff; animation: pulseRecord 1s infinite; transform: scale(1.15); }
         
         @keyframes pulseRecord { 0% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(226, 74, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0); } }
 
         /* Плашка записи видео */
-        .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.7); padding: 5px 12px; border-radius: 15px; font-size: 0.8rem; display: none; align-items: center; gap: 6px; z-index: 20; }
+        .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.85); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; display: none; align-items: center; gap: 8px; z-index: 20; border: 1px solid rgba(255,255,255,0.1); }
         .recording-status.active { display: flex; }
         .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite alternate; }
 
         @media (max-width: 767px) {
-            .sidebar { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 10; }
+            .sidebar { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 15; }
             .chat-main { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 5; }
             .app-wrapper.chat-opened .sidebar { transform: translateX(-100%); }
             .app-wrapper.chat-opened .back-btn { display: block; }
@@ -203,13 +204,22 @@
             <div class="chat-input-panel">
                 <div class="recording-status" id="recStatus"><div class="rec-dot"></div>Запись кружочка...</div>
                 <input type="text" id="mainMessageInput" class="message-input-node" placeholder="Напишите сообщение..." autocomplete="off">
-                <button id="actionBtn" class="action-btn">📹</button>
+                <button id="actionBtn" class="action-btn">
+                    <!-- Иконка камеры по умолчанию -->
+                    <svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                </button>
             </div>
         </div>
     </div>
 
     <script>
         const generateID = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+
+        // Векторные иконки, чтобы Safari гарантированно их отрисовывал
+        const SVG_ICONS = {
+            camera: `<svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
+            send: `<svg id="svgSend" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`
+        };
 
         /** СЕТЕВОЙ ДВИЖОК */
         class SecureNetworkCore {
@@ -345,16 +355,35 @@
                 this.dom.backToSidebarBtn.addEventListener('click', () => { this.dom.appWrapper.classList.remove('chat-opened'); this.activeChatUser = null; });
                 
                 this.dom.mainMessageInput.addEventListener('input', () => {
-                    this.dom.actionBtn.innerText = this.dom.mainMessageInput.value.trim() ? '➤' : '📹';
+                    this.dom.actionBtn.innerHTML = this.dom.mainMessageInput.value.trim() ? SVG_ICONS.send : SVG_ICONS.camera;
                 });
                 this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleActionBtnClick(); });
 
-                // Исправленные тач-события для iOS iPhone 13
-                this.dom.actionBtn.addEventListener('mousedown', (e) => this.handleActionDown(e));
-                this.dom.actionBtn.addEventListener('touchstart', (e) => this.handleActionDown(e), {passive: false});
-                
-                window.addEventListener('mouseup', () => this.handleActionUp());
-                window.addEventListener('touchend', () => this.handleActionUp());
+                // Жесткий тач-бинд под особенности мобильного Safari (iPhone 13)
+                this.dom.actionBtn.addEventListener('touchstart', (e) => {
+                    this.dom.actionBtn.classList.add('ios-active');
+                    if (this.dom.mainMessageInput.value.trim()) {
+                        this.sendTextMessage();
+                    } else {
+                        this.startVideoRecording();
+                    }
+                }, {passive: true});
+
+                this.dom.actionBtn.addEventListener('touchend', (e) => {
+                    this.dom.actionBtn.classList.remove('ios-active');
+                    if (this.isRecording) this.stopVideoRecording();
+                });
+
+                // Десктопный фоллбэк
+                this.dom.actionBtn.addEventListener('mousedown', (e) => {
+                    if (!('ontouchstart' in window)) {
+                        if (this.dom.mainMessageInput.value.trim()) { this.sendTextMessage(); } else { this.startVideoRecording(); }
+                    }
+                });
+                window.addEventListener('mouseup', () => {
+                    if (!('ontouchstart' in window) && this.isRecording) this.stopVideoRecording();
+                });
+
                 this.dom.actionBtn.oncontextmenu = (e) => { e.preventDefault(); return false; }; 
             }
 
@@ -451,19 +480,6 @@
                 this.dom.messagesContainer.scrollTop = this.dom.messagesContainer.scrollHeight;
             }
 
-            handleActionDown(e) {
-                if (e.type === 'touchstart') e.preventDefault(); 
-                if (this.dom.mainMessageInput.value.trim()) {
-                    this.sendTextMessage();
-                } else {
-                    this.startVideoRecording();
-                }
-            }
-
-            handleActionUp() {
-                if (this.isRecording) this.stopVideoRecording();
-            }
-
             handleActionBtnClick() {
                 if (this.dom.mainMessageInput.value.trim()) this.sendTextMessage();
             }
@@ -473,7 +489,7 @@
                 if(!text || !this.activeChatUser) return;
                 this.executeSend('text', text);
                 this.dom.mainMessageInput.value = '';
-                this.dom.actionBtn.innerText = '📹';
+                this.dom.actionBtn.innerHTML = SVG_ICONS.camera;
             }
 
             executeSend(msgType, content) {
@@ -488,7 +504,7 @@
                     this.renderMessagesView();
                     this.renderSidebar(this.dom.globalSearchInput.value);
                 } else {
-                    alert("Нет сети!");
+                    alert("Нет связи с брокером!");
                 }
             }
 
@@ -496,7 +512,7 @@
                 if(!this.activeChatUser) return;
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "user", width: { ideal: 300 }, height: { ideal: 300 } }, 
+                        video: { facingMode: "user", width: { ideal: 400 }, height: { ideal: 400 } }, 
                         audio: true 
                     });
                     
@@ -521,7 +537,10 @@
                     
                     this.mediaRecorder.start();
                 } catch (err) {
-                    alert("Нет доступа к камере! Проверьте, что сайт открыт через HTTPS-соединение.");
+                    alert("Ошибка камеры! Убедись, что: \n1. Сайт открыт по HTTPS\n2. Предоставлен доступ к камере/микрофону в настройках iOS Safari.");
+                    this.dom.actionBtn.classList.remove('recording');
+                    this.dom.recStatus.classList.remove('active');
+                    this.isRecording = false;
                 }
             }
 
