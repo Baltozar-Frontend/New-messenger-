@@ -2,637 +2,92 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Secure Web Messenger (Final iOS Fix)</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>P2P Glolves Messenger</title>
     <style>
-        :root {
-            --bg-main: #0e1621;
-            --bg-sidebar: #17212b;
-            --bg-chat: #0e1621;
-            --bg-active-item: #2b394a;
-            --bg-hover-item: #202b36;
-            --bg-input: #24303f;
-            --bg-msg-in: #182533;
-            --bg-msg-out: #2b5278;
-            --text-main: #f5f5f5;
-            --text-muted: #7f91a4;
-            --text-tick: #7ac1eb;
-            --accent: #5288c1;
-            --accent-hover: #649ad4;
-            --border: #101924;
-            --success: #46b06a;
-            --danger: #e24a4a;
-            --warning: #f5a623;
-        }
-
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            -webkit-tap-highlight-color: transparent; 
-        }
-        
-        body { 
-            background-color: var(--bg-main); 
-            color: var(--text-main); 
-            height: 100vh;
-            height: 100dvh; 
-            width: 100vw; 
-            overflow: hidden; 
-            display: flex; 
-        }
-        
-        .app-wrapper { display: flex; width: 100%; height: 100%; position: relative; }
-
-        /* Авторизация */
-        .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-main); z-index: 1000; display: flex; justify-content: center; align-items: center; }
-        .auth-card { background-color: var(--bg-sidebar); padding: 30px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .auth-card h2 { margin-bottom: 8px; font-size: 1.4rem; }
-        .auth-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
-        .auth-input { width: 100%; padding: 12px; background-color: var(--bg-input); border: 2px solid transparent; border-radius: 8px; color: var(--text-main); font-size: 1rem; outline: none; margin-bottom: 15px; text-align: center; }
-        .auth-input:focus { border-color: var(--accent); }
-        .btn-submit { width: 100%; padding: 12px; background-color: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn-submit:disabled { background-color: var(--bg-input); color: var(--text-muted); cursor: not-allowed; }
-
-        /* Сайдбар */
-        .sidebar { width: 320px; height: 100%; background-color: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease; }
-        .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border); }
-        .profile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .my-info h3 { font-size: 1rem; font-weight: 600; color: var(--accent); }
-        .network-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-muted); }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--danger); box-shadow: 0 0 5px currentColor; }
-        .status-dot.online { background-color: var(--success); }
-        .status-dot.connecting { background-color: var(--warning); animation: pulse 1s infinite alternate; }
-
-        @keyframes pulse { from { opacity: 0.5; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); } }
-
-        .search-input { width: 100%; padding: 10px 12px; background-color: var(--bg-input); border: none; border-radius: 8px; color: var(--text-main); outline: none; font-size: 0.9rem; }
-        .list-scrollable { flex: 1; overflow-y: auto; }
-        .chat-item { display: flex; align-items: center; padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .chat-item:hover { background-color: var(--bg-hover-item); }
-        .chat-item.active { background-color: var(--bg-active-item); }
-        .item-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 12px; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #fff; flex-shrink: 0; }
-        .item-content { flex: 1; min-width: 0; }
-        .item-meta { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .item-name { font-weight: 600; font-size: 0.9rem; }
-        .item-time { font-size: 0.75rem; color: var(--text-muted); }
-        .item-bottom { display: flex; justify-content: space-between; align-items: center; }
-        .item-preview { font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .badge-unread { background-color: var(--accent); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 10px; }
-
-        /* Окно чата */
-        .chat-main { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-chat); position: relative; height: 100%; }
-        .placeholder-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-main); display: flex; justify-content: center; align-items: center; z-index: 5; }
-        .chat-header { height: 55px; background-color: var(--bg-sidebar); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0; }
-        .back-btn { display: none; background: none; border: none; color: var(--accent); font-size: 1.4rem; cursor: pointer; padding: 4px 8px; margin-right: 5px; }
-        .active-user-info h4 { font-size: 0.9rem; font-weight: 600; }
-        .messages-viewport { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
-        
-        /* Сообщения */
-        .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 10px; font-size: 0.9rem; line-height: 1.35; position: relative; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
-        .msg-bubble.inbound { background-color: var(--bg-msg-in); align-self: flex-start; border-bottom-left-radius: 2px; }
-        .msg-bubble.outbound { background-color: var(--bg-msg-out); align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg-bottom-meta { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 4px; font-size: 0.65rem; color: var(--text-muted); }
-        .msg-bubble.outbound .msg-bottom-meta { color: rgba(255,255,255,0.7); }
-        .msg-ticks { font-size: 0.7rem; color: var(--text-tick); font-weight: bold; letter-spacing: -2px; padding-right: 2px; }
-        
-        /* Видео-кружочки в истории чата */
-        .video-circle-container { position: relative; display: inline-block; width: 180px; height: 180px; }
-        .video-circle { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; background: #000; display: block; border: 3px solid transparent; }
-        .msg-bubble.inbound .video-circle { border-color: var(--bg-msg-in); }
-        .msg-bubble.outbound .video-circle { border-color: var(--bg-msg-out); }
-        
-        /* Панель ввода */
-        .chat-input-panel { 
-            background-color: var(--bg-sidebar); 
-            padding: 10px 15px;
-            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-            border-top: 1px solid var(--border); 
-            position: relative;
-            flex-shrink: 0;
-            z-index: 10;
-        }
-        .message-input-node { flex: 1; padding: 12px; background-color: var(--bg-input); border: none; border-radius: 8px; color: var(--text-main); outline: none; font-size: 0.95rem; }
-        
-        /* Кнопка записи */
-        .action-btn { 
-            width: 44px; 
-            height: 44px; 
-            border-radius: 50%; 
-            background: var(--accent); 
-            border: none; 
-            color: #fff; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            cursor: pointer; 
-            transition: all 0.2s ease; 
-            outline: none; 
-            flex-shrink: 0;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        .action-btn svg { width: 22px; height: 22px; fill: currentColor; display: block; }
-        .action-btn:active, .action-btn.ios-active { transform: scale(0.9); background: var(--accent-hover); }
-        .action-btn.recording { background: var(--danger) !important; color: #fff; animation: pulseRecord 1s infinite; transform: scale(1.15); }
-        
-        @keyframes pulseRecord { 0% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(226, 74, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0); } }
-
-        .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.85); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; display: none; align-items: center; gap: 8px; z-index: 20; border: 1px solid rgba(255,255,255,0.1); }
-        .recording-status.active { display: flex; }
-        .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite alternate; }
-
-        /* Всплывающее интерактивное превью камеры над чатом во время удержания */
-        .camera-preview-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0.5);
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            border: 4px solid var(--danger);
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 0 2000px rgba(0,0,0,0.4);
-            overflow: hidden;
-            z-index: 999;
-            background: #000;
-            display: none;
-            opacity: 0;
-            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .camera-preview-overlay.visible {
-            display: block;
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
-        .camera-preview-overlay video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1); /* Зеркалим фронталку, чтобы видеть себя привычно */
-        }
-
-        @media (max-width: 767px) {
-            .sidebar { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 15; }
-            .chat-main { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 5; }
-            .app-wrapper.chat-opened .sidebar { transform: translateX(-100%); }
-            .app-wrapper.chat-opened .back-btn { display: block; }
-            .placeholder-view { display: none !important; }
-            .video-circle { width: 150px; height: 150px; }
-        }
+        body { margin: 0; background: #0e1621; color: white; font-family: sans-serif; height: 100dvh; display: flex; flex-direction: column; }
+        #chat { flex: 1; overflow-y: auto; padding: 10px; }
+        .msg { padding: 10px; margin: 5px; border-radius: 10px; background: #2b5278; max-width: 80%; }
+        /* Исправленный стиль для кружков Glolves.glb */
+        .video-msg { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .controls { padding: 20px; display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 5px; border: none; }
+        button { padding: 10px; border-radius: 5px; background: #5288c1; border: none; color: white; }
     </style>
 </head>
 <body>
 
-    <!-- Превью для отображения лица во время записи -->
-    <div class="camera-preview-overlay" id="cameraPreviewContainer">
-        <video id="cameraPreviewVideo" autoplay muted playsinline webkit-playsinline></video>
-    </div>
+<div id="chat"></div>
+<div class="controls">
+    <input id="peerId" placeholder="ID собеседника">
+    <input id="msgInput" placeholder="Сообщение...">
+    <button onclick="sendMessage()">➤</button>
+    <button id="recBtn">📹 (Зажать)</button>
+</div>
 
-    <div class="app-wrapper" id="appWrapper">
-        <div class="auth-overlay" id="authScreen">
-            <div class="auth-card">
-                <h2>Secure Login</h2>
-                <p>Шифрование AES-256</p>
-                <input type="text" id="usernameInput" class="auth-input" placeholder="Ваш @username" maxlength="15" autocomplete="off">
-                <button class="btn-submit" id="authSubmitBtn" disabled>Войти</button>
-            </div>
-        </div>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+    // Инициализация P2P соединения
+    const peer = new Peer(); 
+    let conn;
 
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="profile-header">
-                    <div class="my-info"><h3 id="myNameNode">@username</h3></div>
-                    <div class="network-status">
-                        <span id="statusText">Оффлайн</span>
-                        <div class="status-dot" id="statusDot"></div>
-                    </div>
-                </div>
-                <input type="text" id="globalSearchInput" class="search-input" placeholder="Новый чат (введите ник)...">
-            </div>
-            <div class="list-scrollable" id="sidebarListContent"></div>
-        </div>
+    peer.on('open', (id) => alert("Твой ID: " + id + " (отправь его другу)"));
 
-        <div class="chat-main">
-            <div class="placeholder-view" id="emptyChatPlaceholder">
-                <p>Выберите чат или введите ник</p>
-            </div>
-            <div class="chat-header">
-                <button class="back-btn" id="backToSidebarBtn">←</button>
-                <div class="item-avatar" id="activeChatAvatar" style="width:34px; height:34px; font-size:0.85rem;">?</div>
-                <div class="active-user-info">
-                    <h4 id="activeChatTitle">Чат не выбран</h4>
-                </div>
-            </div>
-            <div class="messages-viewport" id="messagesContainer"></div>
-            
-            <div class="chat-input-panel">
-                <div class="recording-status" id="recStatus"><div class="rec-dot"></div>Запись кружочка...</div>
-                <input type="text" id="mainMessageInput" class="message-input-node" placeholder="Напишите сообщение..." autocomplete="off">
-                <button id="actionBtn" class="action-btn">
-                    <svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                </button>
-            </div>
-        </div>
-    </div>
+    peer.on('connection', (c) => {
+        conn = c;
+        setupConnection();
+    });
 
-    <script>
-        const generateID = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    function connectToPeer() {
+        conn = peer.connect(document.getElementById('peerId').value);
+        setupConnection();
+    }
 
-        const SVG_ICONS = {
-            camera: `<svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
-            send: `<svg id="svgSend" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`
+    function setupConnection() {
+        conn.on('data', (data) => {
+            if (data.type === 'text') appendMsg(data.content);
+            if (data.type === 'video') appendVideo(data.content);
+        });
+    }
+
+    function sendMessage() {
+        const text = document.getElementById('msgInput').value;
+        conn.send({ type: 'text', content: text });
+        appendMsg("Вы: " + text);
+    }
+
+    function appendMsg(txt) {
+        document.getElementById('chat').innerHTML += `<div class="msg">${txt}</div>`;
+    }
+
+    // Запись видео
+    let mediaRecorder;
+    let chunks = [];
+    const recBtn = document.getElementById('recBtn');
+
+    recBtn.onmousedown = recBtn.ontouchstart = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const reader = new FileReader();
+            reader.onload = () => conn.send({ type: 'video', content: reader.result });
+            reader.readAsDataURL(blob);
+            chunks = [];
         };
+        mediaRecorder.start();
+    };
 
-        /** СЕТЕВОЙ ДВИЖОК - ПЕРЕШЛИ НА БОЛЕЕ СТАБИЛЬНЫЙ HIVEMQ */
-        class SecureNetworkCore {
-            constructor(onMessageReceived, onStatusChange) {
-                this.brokerUrl = 'wss://broker.hivemq.com:8884/mqtt'; 
-                this.networkTopic = 'secure_p2p_chat_matrix_2026_v2'; 
-                this.secretKey = 'SuperSecretEncryptionKey_XYZ'; 
-                this.client = null;
-                this.onMessageReceived = onMessageReceived;
-                this.onStatusChange = onStatusChange;
-                this.isConnected = false;
-            }
+    recBtn.onmouseup = recBtn.ontouchend = () => mediaRecorder.stop();
 
-            connect(username) {
-                this.currentUser = username;
-                this.onStatusChange('connecting');
-                this.client = mqtt.connect(this.brokerUrl, {
-                    clientId: `usr_${username}_${Math.random().toString(16).substr(2, 6)}`,
-                    clean: true
-                });
-
-                this.client.on('connect', () => {
-                    this.isConnected = true;
-                    this.onStatusChange('online');
-                    this.client.subscribe(this.networkTopic, { qos: 1 });
-                });
-                this.client.on('offline', () => { this.isConnected = false; this.onStatusChange('offline'); });
-                this.client.on('message', (topic, message) => this.handleRawMessage(message.toString()));
-            }
-
-            sendPacket(receiver, msgObj) {
-                if (!this.isConnected) return false;
-                const payload = { s: this.currentUser, r: receiver, ...msgObj };
-                const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(payload), this.secretKey).toString();
-                this.client.publish(this.networkTopic, ciphertext, { qos: 1 });
-                return true;
-            }
-
-            handleRawMessage(ciphertext) {
-                try {
-                    const bytes = CryptoJS.AES.decrypt(ciphertext, this.secretKey);
-                    const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
-                    if (!decryptedStr) return;
-                    const data = JSON.parse(decryptedStr);
-                    if (data.r === this.currentUser) this.onMessageReceived(data);
-                } catch (e) {}
-            }
-        }
-
-        /** ЛОКАЛЬНАЯ БАЗА ДАННЫХ */
-        class DatabaseManager {
-            constructor(currentUsername) { this.myKey = `tg_secure_db_v2_${currentUsername}`; }
-            getHistory() {
-                let data = localStorage.getItem(this.myKey);
-                return data ? JSON.parse(data) : {};
-            }
-            saveMessage(chatWith, messageObj) {
-                let history = this.getHistory();
-                if(!history[chatWith]) history[chatWith] = [];
-                history[chatWith].push(messageObj);
-                localStorage.setItem(this.myKey, JSON.stringify(history));
-            }
-            markAllAsReadByMe(chatWith) {
-                let history = this.getHistory();
-                if(!history[chatWith]) return [];
-                let unreadIds = [];
-                history[chatWith].forEach(m => {
-                    if (m.type === 'in' && !m.isRead) { m.isRead = true; unreadIds.push(m.id); }
-                });
-                localStorage.setItem(this.myKey, JSON.stringify(history));
-                return unreadIds;
-            }
-            markAsReadByThem(chatWith, idsArray) {
-                let history = this.getHistory();
-                if(!history[chatWith]) return;
-                history[chatWith].forEach(m => {
-                    if (m.type === 'out' && idsArray.includes(m.id)) m.isRead = true;
-                });
-                localStorage.setItem(this.myKey, JSON.stringify(history));
-            }
-        }
-
-        const VisualGen = {
-            colors: ['#4a90e2', '#e24a4a', '#46b06a', '#f5a623', '#7ac1eb', '#bd10e0'],
-            getColor(str) {
-                let hash = 0; for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                return this.colors[Math.abs(hash) % this.colors.length];
-            },
-            getAvatar(user) { return `<div class="item-avatar" style="background-color: ${this.getColor(user)}">${user.charAt(0).toUpperCase()}</div>`; }
-        };
-
-        class ApplicationEngine {
-            constructor() {
-                this.cacheDOM();
-                this.bindEvents();
-                
-                this.network = new SecureNetworkCore(
-                    (packet) => this.handleNetworkPacket(packet),
-                    (status) => this.updateNetworkUI(status)
-                );
-                
-                this.mediaRecorder = null;
-                this.videoChunks = [];
-                this.isRecording = false;
-                this.activeStream = null;
-
-                if (sessionStorage.getItem('tg_secure_user')) {
-                    this.setupUserSession(sessionStorage.getItem('tg_secure_user'));
-                }
-            }
-
-            cacheDOM() {
-                this.dom = {
-                    appWrapper: document.getElementById('appWrapper'), authScreen: document.getElementById('authScreen'),
-                    usernameInput: document.getElementById('usernameInput'), authSubmitBtn: document.getElementById('authSubmitBtn'),
-                    myNameNode: document.getElementById('myNameNode'), statusText: document.getElementById('statusText'), statusDot: document.getElementById('statusDot'),
-                    globalSearchInput: document.getElementById('globalSearchInput'), sidebarListContent: document.getElementById('sidebarListContent'),
-                    emptyChatPlaceholder: document.getElementById('emptyChatPlaceholder'), activeChatAvatar: document.getElementById('activeChatAvatar'),
-                    activeChatTitle: document.getElementById('activeChatTitle'), messagesContainer: document.getElementById('messagesContainer'),
-                    mainMessageInput: document.getElementById('mainMessageInput'), actionBtn: document.getElementById('actionBtn'),
-                    backToSidebarBtn: document.getElementById('backToSidebarBtn'), recStatus: document.getElementById('recStatus'),
-                    cameraPreviewContainer: document.getElementById('cameraPreviewContainer'), cameraPreviewVideo: document.getElementById('cameraPreviewVideo')
-                };
-            }
-
-            bindEvents() {
-                this.dom.usernameInput.addEventListener('input', (e) => this.dom.authSubmitBtn.disabled = e.target.value.trim().length < 3);
-                this.dom.authSubmitBtn.addEventListener('click', () => {
-                    const u = this.dom.usernameInput.value.trim().toLowerCase();
-                    sessionStorage.setItem('tg_secure_user', u);
-                    this.setupUserSession(u);
-                });
-
-                this.dom.globalSearchInput.addEventListener('input', (e) => this.renderSidebar(e.target.value));
-                this.dom.backToSidebarBtn.addEventListener('click', () => { this.dom.appWrapper.classList.remove('chat-opened'); this.activeChatUser = null; });
-                
-                this.dom.mainMessageInput.addEventListener('input', () => {
-                    this.dom.actionBtn.innerHTML = this.dom.mainMessageInput.value.trim() ? SVG_ICONS.send : SVG_ICONS.camera;
-                });
-                this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleActionBtnClick(); });
-
-                // iOS Touch Events
-                this.dom.actionBtn.addEventListener('touchstart', (e) => {
-                    this.dom.actionBtn.classList.add('ios-active');
-                    if (this.dom.mainMessageInput.value.trim()) {
-                        this.sendTextMessage();
-                    } else {
-                        this.startVideoRecording();
-                    }
-                }, {passive: true});
-
-                this.dom.actionBtn.addEventListener('touchend', (e) => {
-                    this.dom.actionBtn.classList.remove('ios-active');
-                    if (this.isRecording) this.stopVideoRecording();
-                });
-
-                // Desktop Fallbacks
-                this.dom.actionBtn.addEventListener('mousedown', (e) => {
-                    if (!('ontouchstart' in window)) {
-                        if (this.dom.mainMessageInput.value.trim()) { this.sendTextMessage(); } else { this.startVideoRecording(); }
-                    }
-                });
-                window.addEventListener('mouseup', () => {
-                    if (!('ontouchstart' in window) && this.isRecording) this.stopVideoRecording();
-                });
-
-                this.dom.actionBtn.oncontextmenu = (e) => { e.preventDefault(); return false; }; 
-            }
-
-            setupUserSession(username) {
-                this.currentUser = username;
-                this.db = new DatabaseManager(this.currentUser);
-                this.dom.myNameNode.innerText = `@${this.currentUser}`;
-                this.dom.authScreen.style.display = 'none';
-                this.renderSidebar();
-                this.network.connect(this.currentUser);
-            }
-
-            updateNetworkUI(status) {
-                this.dom.statusDot.className = `status-dot ${status}`;
-                this.dom.statusText.innerText = status === 'online' ? 'В сети' : status === 'connecting' ? 'Соединение...' : 'Оффлайн';
-            }
-
-            renderSidebar(filterQuery = '') {
-                let html = '';
-                const history = this.db.getHistory();
-                const q = filterQuery.replace('@', '').trim().toLowerCase();
-
-                if(q) {
-                    html += `<div class="chat-item" onclick="window.app.selectChat('${q}')">
-                                 ${VisualGen.getAvatar(q)}
-                                 <div class="item-content"><div class="item-name">@${q}</div><div class="item-preview">Написать...</div></div>
-                             </div>`;
-                }
-
-                Object.keys(history).filter(u => !q || u.includes(q)).forEach(u => {
-                    const msgs = history[u];
-                    const last = msgs[msgs.length - 1];
-                    if(!last) return;
-                    
-                    const unread = msgs.filter(m => m.type === 'in' && !m.isRead).length;
-                    const previewText = last.msgType === 'video' ? '📹 Видеосообщение' : last.text;
-
-                    html += `
-                        <div class="chat-item ${this.activeChatUser === u ? 'active' : ''}" onclick="window.app.selectChat('${u}')">
-                            ${VisualGen.getAvatar(u)}
-                            <div class="item-content">
-                                <div class="item-meta"><span class="item-name">@${u}</span><span class="item-time">${last.time}</span></div>
-                                <div class="item-bottom">
-                                    <span class="item-preview">${previewText}</span>
-                                    ${unread > 0 ? `<span class="badge-unread">${unread}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>`;
-                });
-                this.dom.sidebarListContent.innerHTML = html;
-            }
-
-            selectChat(username) {
-                this.activeChatUser = username;
-                this.dom.emptyChatPlaceholder.style.display = 'none';
-                this.dom.activeChatTitle.innerText = `@${username}`;
-                this.dom.activeChatAvatar.outerHTML = VisualGen.getAvatar(username);
-                this.dom.activeChatAvatar = document.querySelector('.chat-header .item-avatar'); 
-                this.dom.appWrapper.classList.add('chat-opened');
-                
-                const unreadIds = this.db.markAllAsReadByMe(username);
-                if (unreadIds.length > 0) {
-                    this.network.sendPacket(username, { type: 'read_ack', ids: unreadIds });
-                }
-
-                this.renderMessagesView();
-                this.renderSidebar(this.dom.globalSearchInput.value);
-            }
-
-            renderMessagesView() {
-                if(!this.activeChatUser) return;
-                const messages = this.db.getHistory()[this.activeChatUser] || [];
-                let html = '';
-                
-                messages.forEach(msg => {
-                    const dir = msg.type === 'out' ? 'outbound' : 'inbound';
-                    const ticks = msg.type === 'out' ? `<span class="msg-ticks">${msg.isRead ? '✓✓' : '✓'}</span>` : '';
-                    
-                    // Жесткие атрибуты playsinline и webkit-playsinline против черного экрана в Safari
-                    const content = msg.msgType === 'video' 
-                        ? `<div class="video-circle-container"><video class="video-circle" src="${msg.text}" autoplay loop muted playsinline webkit-playsinline></video></div>` 
-                        : msg.text;
-
-                    html += `
-                        <div class="msg-bubble ${dir}">
-                            ${content}
-                            <div class="msg-bottom-meta">
-                                <span>${msg.time}</span>
-                                ${ticks}
-                            </div>
-                        </div>`;
-                });
-
-                this.dom.messagesContainer.innerHTML = html;
-                this.dom.messagesContainer.scrollTop = this.dom.messagesContainer.scrollHeight;
-
-                // Принудительный старт воспроизведения видео через секунду, чтобы убрать артефакты iOS Safari
-                document.querySelectorAll('.video-circle').forEach(v => {
-                    v.play().catch(() => {});
-                });
-            }
-
-            handleActionBtnClick() {
-                if (this.dom.mainMessageInput.value.trim()) this.sendTextMessage();
-            }
-
-            sendTextMessage() {
-                const text = this.dom.mainMessageInput.value.trim();
-                if(!text || !this.activeChatUser) return;
-                this.executeSend('text', text);
-                this.dom.mainMessageInput.value = '';
-                this.dom.actionBtn.innerHTML = SVG_ICONS.camera;
-            }
-
-            executeSend(msgType, content) {
-                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const msgId = generateID();
-                
-                const packet = { type: 'msg', msgType: msgType, text: content, time: timeStr, id: msgId };
-                const sent = this.network.sendPacket(this.activeChatUser, packet);
-                
-                if (sent) {
-                    this.db.saveMessage(this.activeChatUser, { id: msgId, type: 'out', msgType: msgType, text: content, time: timeStr, isRead: false });
-                    this.renderMessagesView();
-                    this.renderSidebar(this.dom.globalSearchInput.value);
-                } else {
-                    alert("Ошибка отправки! Нет стабильного подключения к сети.");
-                }
-            }
-
-            async startVideoRecording() {
-                if(!this.activeChatUser) return;
-                try {
-                    // Оптимальный профиль захвата для предотвращения зависаний кодеков в iOS 13
-                    this.activeStream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 320 }, frameRate: { ideal: 24 } }, 
-                        audio: true 
-                    });
-                    
-                    this.isRecording = true;
-                    this.videoChunks = [];
-                    
-                    // Показываем превью фронталки на экране, чтобы пользователь видел себя
-                    this.dom.cameraPreviewVideo.srcObject = this.activeStream;
-                    this.dom.cameraPreviewContainer.classList.add('visible');
-
-                    this.dom.actionBtn.classList.add('recording');
-                    this.dom.recStatus.classList.add('active');
-                    
-                    // Используем видеокодек, полностью поддерживаемый плеером Safari
-                    let options = { mimeType: 'video/mp4' };
-                    if (!MediaRecorder.isTypeSupported('video/mp4')) {
-                        options = { mimeType: 'video/webm;codecs=vp8' };
-                    }
-                    
-                    this.mediaRecorder = new MediaRecorder(this.activeStream, options);
-                    this.mediaRecorder.ondataavailable = e => { if(e.data && e.data.size > 0) this.videoChunks.push(e.data); };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        const blob = new Blob(this.videoChunks, { type: options.mimeType });
-                        const reader = new FileReader();
-                        reader.readAsDataURL(blob);
-                        reader.onloadend = () => {
-                            const base64Video = reader.result;
-                            this.executeSend('video', base64Video);
-                        };
-                    };
-                    
-                    this.mediaRecorder.start(100); // Пишем чанками каждые 100мс для стабильности
-                } catch (err) {
-                    alert("Ошибка! Проверь HTTPS соединение и разрешения для камеры/микрофона.");
-                    this.resetRecordingUI();
-                }
-            }
-
-            stopVideoRecording() {
-                this.isRecording = false;
-                this.resetRecordingUI();
-                
-                if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                    this.mediaRecorder.stop();
-                }
-                if (this.activeStream) {
-                    this.activeStream.getTracks().forEach(t => t.stop());
-                }
-            }
-
-            resetRecordingUI() {
-                this.dom.actionBtn.classList.remove('recording');
-                this.dom.recStatus.classList.remove('active');
-                this.dom.cameraPreviewContainer.classList.remove('visible');
-                this.dom.cameraPreviewVideo.srcObject = null;
-            }
-
-            handleNetworkPacket(packet) {
-                if (packet.type === 'read_ack') {
-                    this.db.markAsReadByThem(packet.s, packet.ids);
-                    if (this.activeChatUser === packet.s) this.renderMessagesView();
-                    return;
-                }
-
-                if (packet.type === 'msg') {
-                    let isRead = (this.activeChatUser === packet.s);
-                    this.db.saveMessage(packet.s, { id: packet.id, type: 'in', msgType: packet.msgType, text: packet.text, time: packet.time, isRead: isRead });
-                    
-                    if (isRead) {
-                        this.network.sendPacket(packet.s, { type: 'read_ack', ids: [packet.id] });
-                        this.renderMessagesView();
-                    }
-                    this.renderSidebar(this.dom.globalSearchInput.value);
-                }
-            }
-        }
-
-        window.app = new ApplicationEngine();
-    </script>
+    function appendVideo(base64) {
+        const div = document.createElement('div');
+        div.className = 'msg video-msg';
+        div.innerHTML = `<video src="${base64}" autoplay playsinline loop></video>`;
+        document.getElementById('chat').appendChild(div);
+    }
+</script>
 </body>
 </html>
