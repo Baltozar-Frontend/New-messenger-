@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Secure Web Messenger (iPhone 13 Ultra Fix)</title>
+    <title>Secure Web Messenger (Final iOS Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -101,13 +101,13 @@
         .msg-bubble.outbound .msg-bottom-meta { color: rgba(255,255,255,0.7); }
         .msg-ticks { font-size: 0.7rem; color: var(--text-tick); font-weight: bold; letter-spacing: -2px; padding-right: 2px; }
         
-        /* Видео-кружочки */
-        .video-circle-container { position: relative; display: inline-block; }
+        /* Видео-кружочки в истории чата */
+        .video-circle-container { position: relative; display: inline-block; width: 180px; height: 180px; }
         .video-circle { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; background: #000; display: block; border: 3px solid transparent; }
         .msg-bubble.inbound .video-circle { border-color: var(--bg-msg-in); }
         .msg-bubble.outbound .video-circle { border-color: var(--bg-msg-out); }
         
-        /* Мощное исправление привязки под Safari iOS */
+        /* Панель ввода */
         .chat-input-panel { 
             background-color: var(--bg-sidebar); 
             padding: 10px 15px;
@@ -122,7 +122,7 @@
         }
         .message-input-node { flex: 1; padding: 12px; background-color: var(--bg-input); border: none; border-radius: 8px; color: var(--text-main); outline: none; font-size: 0.95rem; }
         
-        /* Новая кнопка действия с SVG-поддержкой вместо ломающихся эмодзи */
+        /* Кнопка записи */
         .action-btn { 
             width: 44px; 
             height: 44px; 
@@ -147,10 +147,39 @@
         
         @keyframes pulseRecord { 0% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(226, 74, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 74, 74, 0); } }
 
-        /* Плашка записи видео */
         .recording-status { position: absolute; top: -40px; right: 15px; background: rgba(0,0,0,0.85); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; display: none; align-items: center; gap: 8px; z-index: 20; border: 1px solid rgba(255,255,255,0.1); }
         .recording-status.active { display: flex; }
         .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite alternate; }
+
+        /* Всплывающее интерактивное превью камеры над чатом во время удержания */
+        .camera-preview-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            border: 4px solid var(--danger);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 0 2000px rgba(0,0,0,0.4);
+            overflow: hidden;
+            z-index: 999;
+            background: #000;
+            display: none;
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .camera-preview-overlay.visible {
+            display: block;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .camera-preview-overlay video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Зеркалим фронталку, чтобы видеть себя привычно */
+        }
 
         @media (max-width: 767px) {
             .sidebar { width: 100%; position: absolute; left: 0; top: 0; bottom: 0; z-index: 15; }
@@ -163,6 +192,11 @@
     </style>
 </head>
 <body>
+
+    <!-- Превью для отображения лица во время записи -->
+    <div class="camera-preview-overlay" id="cameraPreviewContainer">
+        <video id="cameraPreviewVideo" autoplay muted playsinline webkit-playsinline></video>
+    </div>
 
     <div class="app-wrapper" id="appWrapper">
         <div class="auth-overlay" id="authScreen">
@@ -205,7 +239,6 @@
                 <div class="recording-status" id="recStatus"><div class="rec-dot"></div>Запись кружочка...</div>
                 <input type="text" id="mainMessageInput" class="message-input-node" placeholder="Напишите сообщение..." autocomplete="off">
                 <button id="actionBtn" class="action-btn">
-                    <!-- Иконка камеры по умолчанию -->
                     <svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                 </button>
             </div>
@@ -215,16 +248,15 @@
     <script>
         const generateID = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
-        // Векторные иконки, чтобы Safari гарантированно их отрисовывал
         const SVG_ICONS = {
             camera: `<svg id="svgCam" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`,
             send: `<svg id="svgSend" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`
         };
 
-        /** СЕТЕВОЙ ДВИЖОК */
+        /** СЕТЕВОЙ ДВИЖОК - ПЕРЕШЛИ НА БОЛЕЕ СТАБИЛЬНЫЙ HIVEMQ */
         class SecureNetworkCore {
             constructor(onMessageReceived, onStatusChange) {
-                this.brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+                this.brokerUrl = 'wss://broker.hivemq.com:8884/mqtt'; 
                 this.networkTopic = 'secure_p2p_chat_matrix_2026_v2'; 
                 this.secretKey = 'SuperSecretEncryptionKey_XYZ'; 
                 this.client = null;
@@ -324,6 +356,7 @@
                 this.mediaRecorder = null;
                 this.videoChunks = [];
                 this.isRecording = false;
+                this.activeStream = null;
 
                 if (sessionStorage.getItem('tg_secure_user')) {
                     this.setupUserSession(sessionStorage.getItem('tg_secure_user'));
@@ -339,7 +372,8 @@
                     emptyChatPlaceholder: document.getElementById('emptyChatPlaceholder'), activeChatAvatar: document.getElementById('activeChatAvatar'),
                     activeChatTitle: document.getElementById('activeChatTitle'), messagesContainer: document.getElementById('messagesContainer'),
                     mainMessageInput: document.getElementById('mainMessageInput'), actionBtn: document.getElementById('actionBtn'),
-                    backToSidebarBtn: document.getElementById('backToSidebarBtn'), recStatus: document.getElementById('recStatus')
+                    backToSidebarBtn: document.getElementById('backToSidebarBtn'), recStatus: document.getElementById('recStatus'),
+                    cameraPreviewContainer: document.getElementById('cameraPreviewContainer'), cameraPreviewVideo: document.getElementById('cameraPreviewVideo')
                 };
             }
 
@@ -359,7 +393,7 @@
                 });
                 this.dom.mainMessageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleActionBtnClick(); });
 
-                // Жесткий тач-бинд под особенности мобильного Safari (iPhone 13)
+                // iOS Touch Events
                 this.dom.actionBtn.addEventListener('touchstart', (e) => {
                     this.dom.actionBtn.classList.add('ios-active');
                     if (this.dom.mainMessageInput.value.trim()) {
@@ -374,7 +408,7 @@
                     if (this.isRecording) this.stopVideoRecording();
                 });
 
-                // Десктопный фоллбэк
+                // Desktop Fallbacks
                 this.dom.actionBtn.addEventListener('mousedown', (e) => {
                     if (!('ontouchstart' in window)) {
                         if (this.dom.mainMessageInput.value.trim()) { this.sendTextMessage(); } else { this.startVideoRecording(); }
@@ -462,8 +496,9 @@
                     const dir = msg.type === 'out' ? 'outbound' : 'inbound';
                     const ticks = msg.type === 'out' ? `<span class="msg-ticks">${msg.isRead ? '✓✓' : '✓'}</span>` : '';
                     
+                    // Жесткие атрибуты playsinline и webkit-playsinline против черного экрана в Safari
                     const content = msg.msgType === 'video' 
-                        ? `<div class="video-circle-container"><video class="video-circle" src="${msg.text}" autoplay loop muted playsinline></video></div>` 
+                        ? `<div class="video-circle-container"><video class="video-circle" src="${msg.text}" autoplay loop muted playsinline webkit-playsinline></video></div>` 
                         : msg.text;
 
                     html += `
@@ -478,6 +513,11 @@
 
                 this.dom.messagesContainer.innerHTML = html;
                 this.dom.messagesContainer.scrollTop = this.dom.messagesContainer.scrollHeight;
+
+                // Принудительный старт воспроизведения видео через секунду, чтобы убрать артефакты iOS Safari
+                document.querySelectorAll('.video-circle').forEach(v => {
+                    v.play().catch(() => {});
+                });
             }
 
             handleActionBtnClick() {
@@ -504,53 +544,72 @@
                     this.renderMessagesView();
                     this.renderSidebar(this.dom.globalSearchInput.value);
                 } else {
-                    alert("Нет связи с брокером!");
+                    alert("Ошибка отправки! Нет стабильного подключения к сети.");
                 }
             }
 
             async startVideoRecording() {
                 if(!this.activeChatUser) return;
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "user", width: { ideal: 400 }, height: { ideal: 400 } }, 
+                    // Оптимальный профиль захвата для предотвращения зависаний кодеков в iOS 13
+                    this.activeStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 320 }, frameRate: { ideal: 24 } }, 
                         audio: true 
                     });
                     
                     this.isRecording = true;
                     this.videoChunks = [];
+                    
+                    // Показываем превью фронталки на экране, чтобы пользователь видел себя
+                    this.dom.cameraPreviewVideo.srcObject = this.activeStream;
+                    this.dom.cameraPreviewContainer.classList.add('visible');
+
                     this.dom.actionBtn.classList.add('recording');
                     this.dom.recStatus.classList.add('active');
                     
-                    this.mediaRecorder = new MediaRecorder(stream);
-                    this.mediaRecorder.ondataavailable = e => this.videoChunks.push(e.data);
+                    // Используем видеокодек, полностью поддерживаемый плеером Safari
+                    let options = { mimeType: 'video/mp4' };
+                    if (!MediaRecorder.isTypeSupported('video/mp4')) {
+                        options = { mimeType: 'video/webm;codecs=vp8' };
+                    }
+                    
+                    this.mediaRecorder = new MediaRecorder(this.activeStream, options);
+                    this.mediaRecorder.ondataavailable = e => { if(e.data && e.data.size > 0) this.videoChunks.push(e.data); };
                     
                     this.mediaRecorder.onstop = () => {
-                        const blob = new Blob(this.videoChunks, { type: 'video/webm' });
+                        const blob = new Blob(this.videoChunks, { type: options.mimeType });
                         const reader = new FileReader();
                         reader.readAsDataURL(blob);
                         reader.onloadend = () => {
                             const base64Video = reader.result;
                             this.executeSend('video', base64Video);
                         };
-                        stream.getTracks().forEach(t => t.stop()); 
                     };
                     
-                    this.mediaRecorder.start();
+                    this.mediaRecorder.start(100); // Пишем чанками каждые 100мс для стабильности
                 } catch (err) {
-                    alert("Ошибка камеры! Убедись, что: \n1. Сайт открыт по HTTPS\n2. Предоставлен доступ к камере/микрофону в настройках iOS Safari.");
-                    this.dom.actionBtn.classList.remove('recording');
-                    this.dom.recStatus.classList.remove('active');
-                    this.isRecording = false;
+                    alert("Ошибка! Проверь HTTPS соединение и разрешения для камеры/микрофона.");
+                    this.resetRecordingUI();
                 }
             }
 
             stopVideoRecording() {
                 this.isRecording = false;
-                this.dom.actionBtn.classList.remove('recording');
-                this.dom.recStatus.classList.remove('active');
+                this.resetRecordingUI();
+                
                 if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
                     this.mediaRecorder.stop();
                 }
+                if (this.activeStream) {
+                    this.activeStream.getTracks().forEach(t => t.stop());
+                }
+            }
+
+            resetRecordingUI() {
+                this.dom.actionBtn.classList.remove('recording');
+                this.dom.recStatus.classList.remove('active');
+                this.dom.cameraPreviewContainer.classList.remove('visible');
+                this.dom.cameraPreviewVideo.srcObject = null;
             }
 
             handleNetworkPacket(packet) {
